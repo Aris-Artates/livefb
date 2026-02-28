@@ -47,7 +47,7 @@ function _loadSdk(appId: string): Promise<void> {
   if (_sdkReady) return Promise.resolve();
 
   return new Promise((resolve) => {
-    window.fbAsyncInit = () => {
+    const doInit = () => {
       window.FB.init({
         appId,
         // Do NOT use FB cookies — we manage sessions via our own JWT
@@ -59,8 +59,17 @@ function _loadSdk(appId: string): Promise<void> {
       resolve();
     };
 
+    // SDK already loaded (e.g. cached from previous page visit) — init directly
+    if (typeof window.FB !== "undefined") {
+      doInit();
+      return;
+    }
+
+    // SDK not yet loaded — set the async init callback
+    window.fbAsyncInit = doInit;
+
     if (document.getElementById("facebook-jssdk")) {
-      // Script tag already exists — fbAsyncInit will fire once it loads
+      // Script tag already in DOM and loading — fbAsyncInit will fire when ready
       return;
     }
 
