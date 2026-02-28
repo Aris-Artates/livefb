@@ -2,12 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, constr
 from datetime import datetime
 from app.dependencies import get_current_user, require_admin
-from app.services.supabase_service import (
-    create_qna_session,
-    get_active_qna_session,
-    submit_qna_question,
-    get_supabase_client,
-)
+from app.services import supabase_service as db
 
 router = APIRouter()
 
@@ -29,7 +24,7 @@ class AnswerQuestionRequest(BaseModel):
 
 @router.post("/sessions", status_code=201)
 async def create_session(req: CreateSessionRequest, admin=Depends(require_admin)):
-    return await create_qna_session(
+    return await db.create_qna_session(
         {
             "class_id": req.class_id,
             "title": req.title,
@@ -42,7 +37,7 @@ async def create_session(req: CreateSessionRequest, admin=Depends(require_admin)
 
 @router.get("/sessions/active/{class_id}")
 async def get_active_session(class_id: str, current_user=Depends(get_current_user)):
-    session = await get_active_qna_session(class_id)
+    session = await db.get_active_qna_session(class_id)
     if not session:
         return {"active": False, "session": None}
 
@@ -61,19 +56,11 @@ async def submit_question(
     req: SubmitQuestionRequest,
     current_user=Depends(get_current_user),
 ):
-    sb = get_supabase_client()
-    session = (
-        sb.table("qna_sessions")
-        .select("id")
-        .eq("id", req.session_id)
-        .eq("is_active", True)
-        .maybe_single()
-        .execute()
-    )
-    if not session.data:
+    session = await db.get_qna_session(req.session_id)
+    if not session or not session.get("is_active"):
         raise HTTPException(status_code=404, detail="No active Q&A session found")
 
-    return await submit_qna_question(
+    return await db.submit_qna_question(
         {
             "session_id": req.session_id,
             "student_id": current_user["id"],
@@ -91,28 +78,23 @@ async def answer_question(
     req: AnswerQuestionRequest,
     admin=Depends(require_admin),
 ):
-    sb = get_supabase_client()
-    result = (
-        sb.table("qna_questions")
-        .update(
-            {
-                "is_answered": True,
-                "answer_text": req.answer_text,
-                "answered_at": datetime.utcnow().isoformat(),
-            }
-        )
-        .eq("id", question_id)
-        .execute()
+    updated = await db.update_qna_question(
+        question_id,
+        {
+            "is_answered": True,
+            "answer_text": req.answer_text,
+            "answered_at": datetime.utcnow().isoformat(),
+        },
     )
-    if not result.data:
+    if not updated:
         raise HTTPException(status_code=404, detail="Question not found")
-    return result.data[0]
+    return updated
 
 
 @router.patch("/sessions/{session_id}/close")
 async def close_session(session_id: str, admin=Depends(require_admin)):
-    sb = get_supabase_client()
-    sb.table("qna_sessions").update(
-        {"is_active": False, "ended_at": datetime.utcnow().isoformat()}
-    ).eq("id", session_id).execute()
+    await db.update_qna_session(
+        session_id,
+        {"is_active": False, "ended_at": datetime.utcnow().isoformat()},
+    )
     return {"message": "Q&A session closed"}

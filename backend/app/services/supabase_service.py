@@ -174,21 +174,13 @@ async def get_active_qna_session(class_id: str) -> Optional[Dict]:
     return rows[0] if rows else None
 
 
+async def get_qna_session(session_id: str) -> Optional[Dict]:
+    """Fetch a single Q&A session by ID (regardless of active status)."""
+    return _one("qna_sessions", {"id": f"eq.{session_id}", "select": "id,is_active"})
+
+
 async def submit_qna_question(question_data: Dict) -> Dict:
     return _post("qna_questions", question_data)
-# ─── Enrollments ─────────────────────────────────────────────────────────────
-
-async def check_student_enrollment(student_id: str, class_id: str) -> bool:
-    rows = _get(
-        "enrollments",
-        {
-            "student_id": f"eq.{student_id}",
-            "class_id": f"eq.{class_id}",
-            "select": "id",
-            "limit": "1",
-        },
-    )
-    return bool(rows)
 
 
 # ─── Livestream Admin Actions ────────────────────────────────────────────────
