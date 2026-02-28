@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { initFacebookLivestream } from "../utils/facebook";
 
 interface LivestreamEmbedProps {
   facebookVideoId?: string;
@@ -23,10 +24,11 @@ export default function LivestreamEmbed({
   title = "Facebook Live Stream",
 }: LivestreamEmbedProps) {
   useEffect(() => {
-    // Re-parse XFBML widgets after the component mounts / updates
-    if (typeof window !== "undefined" && window.FB?.XFBML) {
-      window.FB.XFBML.parse();
-    }
+    // Initialise the Livestream App SDK, then re-parse XFBML widgets
+    if (typeof window === "undefined") return;
+    initFacebookLivestream()
+      .then(() => window.FB?.XFBML?.parse())
+      .catch(console.error);
   }, [facebookVideoId]);
 
   if (!facebookVideoId) {

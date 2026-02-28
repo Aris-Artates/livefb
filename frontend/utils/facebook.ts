@@ -1,5 +1,15 @@
 // Facebook JS SDK wrapper
 // Docs: https://developers.facebook.com/docs/javascript/reference/
+//
+// This project uses TWO separate Facebook apps:
+//   1. Login App      — for FB.login() / OAuth  (NEXT_PUBLIC_FACEBOOK_LOGIN_APP_ID)
+//   2. Livestream App — for fb-video XFBML embeds (NEXT_PUBLIC_FACEBOOK_LIVESTREAM_APP_ID)
+//
+// The Facebook JS SDK can only be initialised once per page load.
+// Login pages call initFacebookLogin(); livestream pages call initFacebookLivestream().
+// If the SDK is already initialised when the second function is called, it is a
+// no-op and the existing instance is reused (video embeds work regardless of
+// which App ID was used to init the SDK).
 
 declare global {
   interface Window {
@@ -32,14 +42,15 @@ interface FBAuthResponse {
 
 let _sdkReady = false;
 
-export function initFacebook(): Promise<void> {
+/** Load the Facebook JS SDK and call FB.init() with the given App ID. */
+function _loadSdk(appId: string): Promise<void> {
   if (_sdkReady) return Promise.resolve();
 
   return new Promise((resolve) => {
     window.fbAsyncInit = () => {
       window.FB.init({
-        appId: process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || "",
-        // Do NOT use FB cookies — we manage session via our own JWT
+        appId,
+        // Do NOT use FB cookies — we manage sessions via our own JWT
         cookie: false,
         xfbml: true,
         version: "v18.0",
@@ -49,7 +60,7 @@ export function initFacebook(): Promise<void> {
     };
 
     if (document.getElementById("facebook-jssdk")) {
-      // SDK already loading — wait for fbAsyncInit to fire
+      // Script tag already exists — fbAsyncInit will fire once it loads
       return;
     }
 
@@ -62,9 +73,27 @@ export function initFacebook(): Promise<void> {
   });
 }
 
+/**
+ * Initialise the Facebook JS SDK for the Login / OAuth App.
+ * Call this on the login page before invoking FB.login().
+ * Uses NEXT_PUBLIC_FACEBOOK_LOGIN_APP_ID.
+ */
+export function initFacebookLogin(): Promise<void> {
+  return _loadSdk(process.env.NEXT_PUBLIC_FACEBOOK_LOGIN_APP_ID || "");
+}
+
+/**
+ * Initialise the Facebook JS SDK for the Livestream / Video Embed App.
+ * Call this on pages that render the LivestreamEmbed component.
+ * Uses NEXT_PUBLIC_FACEBOOK_LIVESTREAM_APP_ID.
+ */
+export function initFacebookLivestream(): Promise<void> {
+  return _loadSdk(process.env.NEXT_PUBLIC_FACEBOOK_LIVESTREAM_APP_ID || "");
+}
+
 /** Open Facebook login popup and return the user access token, or null. */
 export async function facebookLogin(): Promise<string | null> {
-  await initFacebook();
+  await initFacebookLogin();
   return new Promise((resolve) => {
     window.FB.login(
       (res) => {
@@ -81,7 +110,7 @@ export async function facebookLogin(): Promise<string | null> {
 
 /** Check existing Facebook login status without a popup. */
 export async function checkFacebookLoginStatus(): Promise<string | null> {
-  await initFacebook();
+  await initFacebookLogin();
   return new Promise((resolve) => {
     window.FB.getLoginStatus((res) => {
       resolve(

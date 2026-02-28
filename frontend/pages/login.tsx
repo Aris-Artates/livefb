@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { authApi } from "../utils/api";
 import { saveTokens, isTokenValid } from "../utils/auth";
-import { initFacebook, facebookLogin } from "../utils/facebook";
+import { initFacebookLogin, facebookLogin } from "../utils/facebook";
 
 export default function LoginPage({ setUser }: { setUser: (u: any) => void }) {
   const router = useRouter();
@@ -17,7 +17,7 @@ export default function LoginPage({ setUser }: { setUser: (u: any) => void }) {
       router.replace("/dashboard");
       return;
     }
-    initFacebook().catch(console.error);
+    initFacebookLogin().catch(console.error);
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {

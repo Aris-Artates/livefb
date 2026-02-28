@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "frontend",
-      "runtimeExecutable": "npm",
+      "runtimeExecutable": "npm.cmd",
       "runtimeArgs": ["run", "dev", "--prefix", "frontend"],
       "port": 3000
     },
