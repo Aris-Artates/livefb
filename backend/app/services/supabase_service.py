@@ -236,6 +236,18 @@ async def upsert_ai_recommendation(data: Dict) -> Dict:
         resp = client.post(f"{_base()}/ai_recommendations", headers=headers, json=data)
         resp.raise_for_status()
         return resp.json()
+
+
+# ─── Classes ──────────────────────────────────────────────────────────────────
+
+async def get_all_classes() -> List[Dict]:
+    return _get("classes", {"is_active": "eq.true", "order": "title.asc"})
+
+
+async def get_livestream_by_facebook_video_id(fb_video_id: str) -> Optional[Dict]:
+    return _one("livestreams", {"facebook_video_id": f"eq.{fb_video_id}"})
+
+
 def get_supabase_client():
     """
     TEMPORARY STUB: 

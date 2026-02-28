@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import auth, livestreams, comments, quizzes, qna, ai
+from app.routes import auth, livestreams, comments, quizzes, qna, ai, classes, webhooks
 from app.config import settings
 
 app = FastAPI(
@@ -27,6 +27,8 @@ app.include_router(comments.router, prefix="/api/comments", tags=["comments"])
 app.include_router(quizzes.router, prefix="/api/quizzes", tags=["quizzes"])
 app.include_router(qna.router, prefix="/api/qna", tags=["qna"])
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
+app.include_router(classes.router, prefix="/api/classes", tags=["classes"])
+app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
 
 
 @app.get("/health")
