@@ -14,10 +14,13 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: str
     SUPABASE_ANON_KEY: str
 
-    # Facebook
-    FACEBOOK_APP_ID: str
-    FACEBOOK_APP_SECRET: str
-    FACEBOOK_REDIRECT_URI: str
+    # Facebook — Login / OAuth App
+    FACEBOOK_LOGIN_APP_ID: str
+    FACEBOOK_LOGIN_APP_SECRET: str
+    FACEBOOK_LOGIN_REDIRECT_URI: str
+
+    # Facebook — Livestream / Video Embed App (App ID only; secret is not used server-side)
+    FACEBOOK_LIVESTREAM_APP_ID: str
 
     # Ollama (local)
     OLLAMA_BASE_URL: str = "http://localhost:11434"

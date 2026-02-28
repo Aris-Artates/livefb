@@ -7,7 +7,11 @@
       "Bash(curl -s http://localhost:8000/health)",
       "Bash(python -c \"import fastapi, pydantic_settings\")",
       "Bash(pip install -r requirements.txt)",
-      "Bash(curl -s http://localhost:8000/docs)"
+      "Bash(curl -s http://localhost:8000/docs)",
+      "Bash(where npm)",
+      "Bash(npm install)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx tsc --noEmit --skipLibCheck pages/login.tsx components/LivestreamEmbed.tsx utils/facebook.ts)"
     ]
   }
 }
