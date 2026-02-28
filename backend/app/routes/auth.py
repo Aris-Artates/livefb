@@ -130,35 +130,57 @@ async def refresh_tokens(refresh_token: str):
 @router.post("/facebook/callback", response_model=TokenResponse)
 async def facebook_oauth_callback(facebook_access_token: str):
     """Exchange a Facebook user access token for an app JWT."""
-    fb_user = await _verify_facebook_token(facebook_access_token)
-    fb_id = fb_user["id"]
+    import traceback, logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        fb_user = await _verify_facebook_token(facebook_access_token)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("FB token verification failed: %s", traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"FB token verification error: {e}")
+
+    fb_id = fb_user.get("id")
     fb_email = fb_user.get("email")
 
-    # 1. Try find by Facebook ID
-    user = await get_user_by_facebook_id(fb_id)
+    if not fb_id:
+        raise HTTPException(status_code=400, detail=f"Facebook did not return a user ID. Response: {fb_user}")
 
-    # 2. Try find by email and bind Facebook ID
-    if not user and fb_email:
-        existing = await get_user_by_email(fb_email)
-        if existing:
-            user = await update_user(existing["id"], {"facebook_id": fb_id})
+    try:
+        # 1. Try find by Facebook ID
+        user = await get_user_by_facebook_id(fb_id)
 
-    # 3. Create new account
-    if not user:
-        avatar = (
-            fb_user.get("picture", {}).get("data", {}).get("url")
-            if isinstance(fb_user.get("picture"), dict)
-            else None
-        )
-        user = await create_user(
-            {
-                "id": str(uuid.uuid4()),
-                "email": fb_email or f"fb_{fb_id}@placeholder.local",
-                "full_name": fb_user.get("name", "Facebook User"),
-                "facebook_id": fb_id,
-                "role": "student",
-                "avatar_url": avatar,
-            }
+        # 2. Try find by email and bind Facebook ID
+        if not user and fb_email:
+            existing = await get_user_by_email(fb_email)
+            if existing:
+                user = await update_user(existing["id"], {"facebook_id": fb_id})
+
+        # 3. Create new account
+        if not user:
+            avatar = (
+                fb_user.get("picture", {}).get("data", {}).get("url")
+                if isinstance(fb_user.get("picture"), dict)
+                else None
+            )
+            user = await create_user(
+                {
+                    "id": str(uuid.uuid4()),
+                    "email": fb_email or f"fb_{fb_id}@placeholder.local",
+                    "full_name": fb_user.get("name", "Facebook User"),
+                    "facebook_id": fb_id,
+                    "role": "student",
+                    "avatar_url": avatar,
+                }
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("DB error in facebook_oauth_callback: %s", traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error: {type(e).__name__}: {e}. Check that the 'users' table exists in Supabase with columns: id, email, hashed_password, full_name, role, facebook_id, avatar_url.",
         )
 
     return TokenResponse(
