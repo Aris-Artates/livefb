@@ -4,6 +4,17 @@ import Cookies from "js-cookie";
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// Cookie options must match what auth.ts writes so we can update them here too
+const COOKIE_OPTS: Cookies.CookieAttributes = {
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "strict",
+  expires: 1,   // access token: 1 day cookie lifetime
+};
+const REFRESH_OPTS: Cookies.CookieAttributes = {
+  ...COOKIE_OPTS,
+  expires: 30,  // refresh token: 30 days — keeps users logged in for a month
+};
+
 export const api = axios.create({
   baseURL: API_BASE,
   withCredentials: false, // JWT in Authorization header, not cookies sent to backend
@@ -16,16 +27,65 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Redirect to /login on 401
+// ─── Auto-refresh on 401 ──────────────────────────────────────────────────────
+// When the access token expires the backend returns 401.  We silently swap it
+// for a new one using the refresh token so the user stays logged in.
+//
+// Deduplication: if multiple requests fail with 401 at the same time we only
+// call /refresh once and queue the retries behind the same promise.
+
+let _pendingRefresh: Promise<string> | null = null;
+
+async function _doRefresh(): Promise<string> {
+  const refreshToken = Cookies.get("refresh_token");
+  if (!refreshToken) throw new Error("No refresh token stored");
+
+  // Use a plain axios call (not `api`) to avoid triggering this interceptor again
+  const res = await axios.post(`${API_BASE}/api/auth/refresh`, null, {
+    params: { refresh_token: refreshToken },
+  });
+
+  const { access_token, refresh_token: newRefresh } = res.data;
+  Cookies.set("access_token", access_token, COOKIE_OPTS);
+  Cookies.set("refresh_token", newRefresh, REFRESH_OPTS);
+  return access_token;
+}
+
 api.interceptors.response.use(
   (r) => r,
-  (err) => {
-    if (typeof window !== "undefined" && err.response?.status === 401) {
+  async (err) => {
+    const original = err.config;
+
+    // Don't retry refresh calls themselves, and only handle 401s
+    if (
+      err.response?.status !== 401 ||
+      original._retry ||
+      original.url?.includes("/api/auth/refresh")
+    ) {
+      return Promise.reject(err);
+    }
+
+    original._retry = true;
+
+    try {
+      // Deduplicate: all concurrent 401s share one refresh call
+      if (!_pendingRefresh) {
+        _pendingRefresh = _doRefresh().finally(() => {
+          _pendingRefresh = null;
+        });
+      }
+      const newToken = await _pendingRefresh;
+
+      // Retry the original request with the fresh token
+      original.headers.Authorization = `Bearer ${newToken}`;
+      return api(original);
+    } catch {
+      // Refresh failed (expired or revoked) — send to login
       Cookies.remove("access_token");
       Cookies.remove("refresh_token");
-      window.location.href = "/login";
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return Promise.reject(err);
     }
-    return Promise.reject(err);
   }
 );
 
@@ -44,6 +104,11 @@ interface LoginData {
 export const authApi = {
   register: (data: RegisterData) => api.post("/api/auth/register", data),
   login: (data: LoginData) => api.post("/api/auth/login", data),
+  // Use plain axios (not `api`) for refresh so the 401 interceptor isn't triggered
+  refresh: (refreshToken: string) =>
+    axios.post(`${API_BASE}/api/auth/refresh`, null, {
+      params: { refresh_token: refreshToken },
+    }),
   facebookCallback: (token: string) =>
     api.post("/api/auth/facebook/callback", null, {
       params: { facebook_access_token: token },
