@@ -3,14 +3,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 from app.dependencies import get_current_user, require_admin
-from app.services.supabase_service import (
-    get_quiz,
-    get_quizzes_for_class,
-    submit_quiz_answer,
-    get_student_quiz_answers,
-    get_quiz_results_admin,
-    get_supabase_client,
-)
+from app.services import supabase_service as db
 
 router = APIRouter()
 
@@ -50,16 +43,9 @@ class CreateQuestionRequest(BaseModel):
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
-def _assert_enrolled(student_id: str, class_id: str):
-    sb = get_supabase_client()
-    result = (
-        sb.table("enrollments")
-        .select("id")
-        .eq("student_id", student_id)
-        .eq("class_id", class_id)
-        .execute()
-    )
-    if not result.data:
+async def _assert_enrolled(student_id: str, class_id: str):
+    enrolled = await db.check_student_enrollment(student_id, class_id)
+    if not enrolled:
         raise HTTPException(status_code=403, detail="Not enrolled in this class")
 
 
@@ -68,13 +54,13 @@ def _assert_enrolled(student_id: str, class_id: str):
 @router.get("/class/{class_id}")
 async def list_class_quizzes(class_id: str, current_user=Depends(get_current_user)):
     if current_user["role"] == "student":
-        _assert_enrolled(current_user["id"], class_id)
-    return await get_quizzes_for_class(class_id)
+        await _assert_enrolled(current_user["id"], class_id)
+    return await db.get_quizzes_for_class(class_id)
 
 
 @router.get("/{quiz_id}")
 async def get_quiz_detail(quiz_id: str, current_user=Depends(get_current_user)):
-    quiz = await get_quiz(quiz_id)
+    quiz = await db.get_quiz(quiz_id)
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
 
@@ -88,39 +74,30 @@ async def get_quiz_detail(quiz_id: str, current_user=Depends(get_current_user)):
 
 @router.post("/", status_code=201)
 async def create_quiz(req: CreateQuizRequest, admin=Depends(require_admin)):
-    sb = get_supabase_client()
-    result = sb.table("quizzes").insert(
+    return await db.create_quiz_record(
         {**req.model_dump(), "created_by": admin["id"], "is_active": False}
-    ).execute()
-    return result.data[0]
+    )
 
 
 @router.post("/questions", status_code=201)
 async def add_question(req: CreateQuestionRequest, admin=Depends(require_admin)):
-    sb = get_supabase_client()
-    result = sb.table("quiz_questions").insert(req.model_dump()).execute()
-    return result.data[0]
+    return await db.add_quiz_question(req.model_dump())
 
 
 @router.post("/trigger")
 async def trigger_live_quiz(req: TriggerQuizRequest, admin=Depends(require_admin)):
-    sb = get_supabase_client()
-    result = (
-        sb.table("quizzes")
-        .update({"is_active": True, "triggered_at": datetime.utcnow().isoformat()})
-        .eq("id", req.quiz_id)
-        .eq("class_id", req.class_id)
-        .execute()
+    updated = await db.update_quiz_record(
+        req.quiz_id,
+        {"is_active": True, "triggered_at": datetime.utcnow().isoformat()},
     )
-    if not result.data:
+    if not updated:
         raise HTTPException(status_code=404, detail="Quiz not found")
-    return {"message": "Quiz triggered", "quiz": result.data[0]}
+    return {"message": "Quiz triggered", "quiz": updated}
 
 
 @router.post("/{quiz_id}/close")
 async def close_quiz(quiz_id: str, admin=Depends(require_admin)):
-    sb = get_supabase_client()
-    sb.table("quizzes").update({"is_active": False}).eq("id", quiz_id).execute()
+    await db.update_quiz_record(quiz_id, {"is_active": False})
     return {"message": "Quiz closed"}
 
 
@@ -133,24 +110,17 @@ async def submit_answer(
     if req.selected_option not in ("a", "b", "c", "d"):
         raise HTTPException(status_code=422, detail="selected_option must be a, b, c, or d")
 
-    quiz = await get_quiz(quiz_id)
+    quiz = await db.get_quiz(quiz_id)
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
     if not quiz.get("is_active"):
         raise HTTPException(status_code=400, detail="Quiz is not currently active")
 
-    sb = get_supabase_client()
-    existing = (
-        sb.table("quiz_answers")
-        .select("id")
-        .eq("student_id", current_user["id"])
-        .eq("question_id", req.question_id)
-        .execute()
-    )
-    if existing.data:
+    already_answered = await db.check_quiz_answer_exists(current_user["id"], req.question_id)
+    if already_answered:
         raise HTTPException(status_code=400, detail="Answer already submitted for this question")
 
-    answer = await submit_quiz_answer(
+    answer = await db.submit_quiz_answer(
         {
             "student_id": current_user["id"],
             "quiz_id": quiz_id,
@@ -165,11 +135,11 @@ async def submit_answer(
 @router.get("/{quiz_id}/my-results")
 async def get_my_results(quiz_id: str, current_user=Depends(get_current_user)):
     """Students can only see their own results."""
-    quiz = await get_quiz(quiz_id)
+    quiz = await db.get_quiz(quiz_id)
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
 
-    answers = await get_student_quiz_answers(current_user["id"], quiz_id)
+    answers = await db.get_student_quiz_answers(current_user["id"], quiz_id)
     questions = quiz.get("quiz_questions") or []
     correct_map = {q["id"]: q["correct_answer"] for q in questions}
     total = len(questions)
@@ -189,4 +159,4 @@ async def get_my_results(quiz_id: str, current_user=Depends(get_current_user)):
 @router.get("/{quiz_id}/results")
 async def get_all_results(quiz_id: str, admin=Depends(require_admin)):
     """Admin only: all students' results for a quiz."""
-    return await get_quiz_results_admin(quiz_id)
+    return await db.get_quiz_results_admin(quiz_id)

@@ -121,6 +121,16 @@ export const authApi = {
 export const livestreamApi = {
   list: () => api.get("/api/livestreams/"),
   get: (id: string) => api.get(`/api/livestreams/${id}`),
+  create: (data: {
+    class_id: string;
+    title: string;
+    facebook_video_id?: string;
+    facebook_group_id?: string;
+    scheduled_at?: string;
+    is_private?: boolean;
+  }) => api.post("/api/livestreams/", data),
+  activate: (id: string) => api.patch(`/api/livestreams/${id}/activate`),
+  deactivate: (id: string) => api.patch(`/api/livestreams/${id}/deactivate`),
 };
 
 export const commentApi = {
@@ -134,6 +144,27 @@ export const quizApi = {
   getForClass: (classId: string) =>
     api.get(`/api/quizzes/class/${classId}`),
   get: (quizId: string) => api.get(`/api/quizzes/${quizId}`),
+  create: (data: {
+    class_id: string;
+    title: string;
+    subject?: string;
+    time_limit_seconds?: number;
+    is_live?: boolean;
+  }) => api.post("/api/quizzes/", data),
+  addQuestion: (data: {
+    quiz_id: string;
+    question_text: string;
+    option_a: string;
+    option_b: string;
+    option_c?: string;
+    option_d?: string;
+    correct_answer: string;
+    points?: number;
+    order_index?: number;
+  }) => api.post("/api/quizzes/questions", data),
+  trigger: (quizId: string, classId: string) =>
+    api.post("/api/quizzes/trigger", { quiz_id: quizId, class_id: classId }),
+  close: (quizId: string) => api.post(`/api/quizzes/${quizId}/close`),
   submitAnswer: (
     quizId: string,
     questionId: string,
@@ -146,11 +177,17 @@ export const quizApi = {
     }),
   getMyResults: (quizId: string) =>
     api.get(`/api/quizzes/${quizId}/my-results`),
+  getAllResults: (quizId: string) =>
+    api.get(`/api/quizzes/${quizId}/results`),
 };
 
 export const qnaApi = {
   getActiveSession: (classId: string) =>
     api.get(`/api/qna/sessions/active/${classId}`),
+  createSession: (classId: string, title: string) =>
+    api.post("/api/qna/sessions", { class_id: classId, title }),
+  closeSession: (sessionId: string) =>
+    api.patch(`/api/qna/sessions/${sessionId}/close`),
   submitQuestion: (
     sessionId: string,
     questionText: string,
@@ -160,6 +197,10 @@ export const qnaApi = {
       session_id: sessionId,
       question_text: questionText,
       is_anonymous: isAnonymous,
+    }),
+  answerQuestion: (questionId: string, answerText: string) =>
+    api.patch(`/api/qna/questions/${questionId}/answer`, {
+      answer_text: answerText,
     }),
 };
 
