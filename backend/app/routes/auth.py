@@ -2,15 +2,18 @@ import uuid
 import httpx
 from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel, EmailStr
+from jose import JWTError
 from app.services.auth_service import (
     hash_password,
     verify_password,
     create_access_token,
     create_refresh_token,
+    decode_token,
 )
 from app.services.supabase_service import (
     get_user_by_email,
     get_user_by_facebook_id,
+    get_user_by_id,
     create_user,
     update_user,
 )
@@ -96,6 +99,32 @@ async def login(req: LoginRequest):
         refresh_token=create_refresh_token({"sub": user["id"]}),
         user=_safe_user(user),
     )
+
+
+@router.post("/refresh")
+async def refresh_tokens(refresh_token: str):
+    """Exchange a valid refresh token for a fresh access + refresh token pair."""
+    try:
+        payload = decode_token(refresh_token)
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    if payload.get("type") != "refresh":
+        raise HTTPException(status_code=401, detail="Not a refresh token")
+
+    user_id: str | None = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    user = await get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="User no longer exists")
+
+    return {
+        "access_token": create_access_token({"sub": user["id"], "role": user["role"]}),
+        "refresh_token": create_refresh_token({"sub": user["id"]}),
+        "token_type": "bearer",
+    }
 
 
 @router.post("/facebook/callback", response_model=TokenResponse)
