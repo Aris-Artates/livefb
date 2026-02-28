@@ -19,9 +19,6 @@ class Settings(BaseSettings):
     FACEBOOK_LOGIN_APP_SECRET: str
     FACEBOOK_LOGIN_REDIRECT_URI: str
 
-    # Facebook — Livestream / Video Embed App (App ID only; secret is not used server-side)
-    FACEBOOK_LIVESTREAM_APP_ID: str
-
     # Ollama (local)
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3.2"
