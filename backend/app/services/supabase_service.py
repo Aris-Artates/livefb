@@ -1,176 +1,178 @@
-from supabase import create_client, Client
+"""
+Supabase database access via the REST API (PostgREST).
+
+We call the Supabase REST API directly with httpx instead of using the
+supabase-py client library.  The reason: supabase-py validates the API
+key as a JWT in its constructor, but Supabase's newer  sb_secret_* /
+sb_publishable_* keys are NOT JWTs — so supabase-py raises
+SupabaseException("Invalid API key") before making any network call.
+
+Direct httpx calls have no such restriction; we confirmed they work
+with the sb_secret_* service-role key.
+"""
+
+import httpx
 from app.config import settings
 from typing import Optional, List, Dict, Any
 
-# Use service_role key — bypass RLS for trusted backend operations
-_client: Optional[Client] = None
+# Build base URL and re-usable headers once at import time.
+# These use settings, so they are evaluated lazily via _headers() to avoid
+# import-time errors when settings are not yet loaded in tests.
+
+def _base() -> str:
+    return f"{settings.SUPABASE_URL}/rest/v1"
+
+def _headers(prefer: str = "return=representation") -> dict:
+    return {
+        "apikey": settings.SUPABASE_SERVICE_KEY,
+        "Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": prefer,
+    }
 
 
-def get_supabase_client() -> Client:
-    global _client
-    if _client is None:
-        _client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-    return _client
+# ─── Low-level helpers ────────────────────────────────────────────────────────
+
+def _get(table: str, params: dict) -> list:
+    with httpx.Client(timeout=10) as client:
+        resp = client.get(f"{_base()}/{table}", headers=_headers(), params=params)
+        resp.raise_for_status()
+        return resp.json() or []
+
+
+def _post(table: str, data: dict) -> dict:
+    with httpx.Client(timeout=10) as client:
+        resp = client.post(f"{_base()}/{table}", headers=_headers(), json=data)
+        resp.raise_for_status()
+        result = resp.json()
+        return result[0] if isinstance(result, list) else result
+
+
+def _patch(table: str, params: dict, data: dict) -> dict:
+    with httpx.Client(timeout=10) as client:
+        resp = client.patch(
+            f"{_base()}/{table}", headers=_headers(), params=params, json=data
+        )
+        resp.raise_for_status()
+        result = resp.json()
+        return result[0] if isinstance(result, list) else result
+
+
+def _one(table: str, params: dict) -> Optional[dict]:
+    """Return the first matching row, or None."""
+    rows = _get(table, {**params, "limit": "1"})
+    return rows[0] if rows else None
 
 
 # ─── Users ────────────────────────────────────────────────────────────────────
 
 async def get_user_by_id(user_id: str) -> Optional[Dict]:
-    sb = get_supabase_client()
-    result = sb.table("users").select("*").eq("id", user_id).maybe_single().execute()
-    return result.data
+    return _one("users", {"id": f"eq.{user_id}"})
 
 
 async def get_user_by_email(email: str) -> Optional[Dict]:
-    sb = get_supabase_client()
-    result = sb.table("users").select("*").eq("email", email).maybe_single().execute()
-    return result.data
+    return _one("users", {"email": f"eq.{email}"})
 
 
 async def get_user_by_facebook_id(facebook_id: str) -> Optional[Dict]:
-    sb = get_supabase_client()
-    result = (
-        sb.table("users").select("*").eq("facebook_id", facebook_id).maybe_single().execute()
-    )
-    return result.data
+    return _one("users", {"facebook_id": f"eq.{facebook_id}"})
 
 
 async def create_user(user_data: Dict) -> Dict:
-    sb = get_supabase_client()
-    result = sb.table("users").insert(user_data).execute()
-    return result.data[0]
+    return _post("users", user_data)
 
 
 async def update_user(user_id: str, updates: Dict) -> Dict:
-    sb = get_supabase_client()
-    result = sb.table("users").update(updates).eq("id", user_id).execute()
-    return result.data[0]
+    return _patch("users", {"id": f"eq.{user_id}"}, updates)
 
 
 # ─── Livestreams ──────────────────────────────────────────────────────────────
 
 async def get_livestream(livestream_id: str) -> Optional[Dict]:
-    sb = get_supabase_client()
-    result = (
-        sb.table("livestreams")
-        .select("*, classes(*)")
-        .eq("id", livestream_id)
-        .maybe_single()
-        .execute()
+    rows = _get(
+        "livestreams",
+        {"id": f"eq.{livestream_id}", "select": "*, classes(*)", "limit": "1"},
     )
-    return result.data
+    return rows[0] if rows else None
 
 
 async def get_livestreams_for_student(student_id: str) -> List[Dict]:
-    sb = get_supabase_client()
-    # Fetch livestreams for classes the student is enrolled in
-    result = (
-        sb.table("livestreams")
-        .select("*, classes!inner(*), classes!inner(enrollments!inner(student_id))")
-        .eq("classes.enrollments.student_id", student_id)
-        .execute()
-    )
-    return result.data or []
+    # Fetch all livestreams; filtering by enrollment is done in the route layer
+    return _get("livestreams", {"select": "*, classes(*)"})
 
 
 async def get_all_livestreams() -> List[Dict]:
-    sb = get_supabase_client()
-    result = sb.table("livestreams").select("*, classes(*)").execute()
-    return result.data or []
+    return _get("livestreams", {"select": "*, classes(*)"})
 
 
 # ─── Comments ─────────────────────────────────────────────────────────────────
 
 async def create_comment(comment_data: Dict) -> Dict:
-    sb = get_supabase_client()
-    result = sb.table("comments").insert(comment_data).execute()
-    return result.data[0]
+    return _post("comments", comment_data)
 
 
 async def get_comments_for_livestream(livestream_id: str) -> List[Dict]:
-    sb = get_supabase_client()
-    result = (
-        sb.table("comments")
-        .select("*, users(full_name, avatar_url)")
-        .eq("livestream_id", livestream_id)
-        .eq("is_deleted", False)
-        .order("created_at")
-        .execute()
+    return _get(
+        "comments",
+        {
+            "livestream_id": f"eq.{livestream_id}",
+            "is_deleted": "eq.false",
+            "select": "*, users(full_name, avatar_url)",
+            "order": "created_at.asc",
+        },
     )
-    return result.data or []
 
 
 # ─── Quizzes ──────────────────────────────────────────────────────────────────
 
 async def get_quiz(quiz_id: str) -> Optional[Dict]:
-    sb = get_supabase_client()
-    result = (
-        sb.table("quizzes")
-        .select("*, quiz_questions(*)")
-        .eq("id", quiz_id)
-        .maybe_single()
-        .execute()
+    rows = _get(
+        "quizzes",
+        {"id": f"eq.{quiz_id}", "select": "*, quiz_questions(*)", "limit": "1"},
     )
-    return result.data
+    return rows[0] if rows else None
 
 
 async def get_quizzes_for_class(class_id: str) -> List[Dict]:
-    sb = get_supabase_client()
-    result = sb.table("quizzes").select("*").eq("class_id", class_id).execute()
-    return result.data or []
+    return _get("quizzes", {"class_id": f"eq.{class_id}"})
 
 
 async def submit_quiz_answer(answer_data: Dict) -> Dict:
-    sb = get_supabase_client()
-    result = sb.table("quiz_answers").insert(answer_data).execute()
-    return result.data[0]
+    return _post("quiz_answers", answer_data)
 
 
 async def get_student_quiz_answers(student_id: str, quiz_id: str) -> List[Dict]:
-    sb = get_supabase_client()
-    result = (
-        sb.table("quiz_answers")
-        .select("*")
-        .eq("student_id", student_id)
-        .eq("quiz_id", quiz_id)
-        .execute()
+    return _get(
+        "quiz_answers",
+        {"student_id": f"eq.{student_id}", "quiz_id": f"eq.{quiz_id}"},
     )
-    return result.data or []
 
 
 async def get_quiz_results_admin(quiz_id: str) -> List[Dict]:
-    sb = get_supabase_client()
-    result = (
-        sb.table("quiz_answers")
-        .select("*, users(full_name, email)")
-        .eq("quiz_id", quiz_id)
-        .execute()
+    return _get(
+        "quiz_answers",
+        {"quiz_id": f"eq.{quiz_id}", "select": "*, users(full_name, email)"},
     )
-    return result.data or []
 
 
 # ─── Q&A ──────────────────────────────────────────────────────────────────────
 
 async def create_qna_session(session_data: Dict) -> Dict:
-    sb = get_supabase_client()
-    result = sb.table("qna_sessions").insert(session_data).execute()
-    return result.data[0]
+    return _post("qna_sessions", session_data)
 
 
 async def get_active_qna_session(class_id: str) -> Optional[Dict]:
-    sb = get_supabase_client()
-    result = (
-        sb.table("qna_sessions")
-        .select("*, qna_questions(*)")
-        .eq("class_id", class_id)
-        .eq("is_active", True)
-        .maybe_single()
-        .execute()
+    rows = _get(
+        "qna_sessions",
+        {
+            "class_id": f"eq.{class_id}",
+            "is_active": "eq.true",
+            "select": "*, qna_questions(*)",
+            "limit": "1",
+        },
     )
-    return result.data
+    return rows[0] if rows else None
 
 
 async def submit_qna_question(question_data: Dict) -> Dict:
-    sb = get_supabase_client()
-    result = sb.table("qna_questions").insert(question_data).execute()
-    return result.data[0]
+    return _post("qna_questions", question_data)
