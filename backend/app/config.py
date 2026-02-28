@@ -19,6 +19,15 @@ class Settings(BaseSettings):
     FACEBOOK_LOGIN_APP_SECRET: str
     FACEBOOK_LOGIN_REDIRECT_URI: str
 
+    # Facebook — Webhook verification token (set any random string, paste same in FB app dashboard)
+    FACEBOOK_WEBHOOK_VERIFY_TOKEN: str = "livefb_webhook_token"
+
+    # Facebook — Default Group ID to watch for live videos (the group ID from your stream URL)
+    FACEBOOK_DEFAULT_GROUP_ID: str = ""
+
+    # Facebook — Default Class ID to assign auto-detected livestreams to
+    FACEBOOK_DEFAULT_CLASS_ID: str = ""
+
     # Ollama (local)
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3.2"

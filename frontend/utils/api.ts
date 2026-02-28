@@ -204,6 +204,10 @@ export const qnaApi = {
     }),
 };
 
+export const classesApi = {
+  list: () => api.get("/api/classes/"),
+};
+
 export const aiApi = {
   getRecommendations: (studentId: string) =>
     api.get(`/api/ai/recommendations/${studentId}`),
