@@ -16,7 +16,6 @@ export default function RegisterPage({ setUser }: { setUser: (u: any) => void })
       router.replace("/dashboard");
       return;
     }
-    // Pre-load the Facebook SDK so the popup opens instantly on click
     initFacebookLogin().catch(console.error);
   }, []);
 
@@ -49,7 +48,6 @@ export default function RegisterPage({ setUser }: { setUser: (u: any) => void })
         setError("Facebook sign-up cancelled or denied.");
         return;
       }
-      // The backend automatically creates an account for new Facebook users
       const res = await authApi.facebookCallback(fbToken);
       const { access_token, refresh_token, user } = res.data;
       saveTokens(access_token, refresh_token);
@@ -69,7 +67,7 @@ export default function RegisterPage({ setUser }: { setUser: (u: any) => void })
           Create Account
         </h1>
         <p className="text-center text-gray-500 text-sm mb-6">
-          Sign up with Facebook or fill in the form below
+          Fill in the form below or sign up with Facebook
         </p>
 
         {error && (
@@ -78,25 +76,7 @@ export default function RegisterPage({ setUser }: { setUser: (u: any) => void })
           </div>
         )}
 
-        {/* Facebook sign-up — fastest path */}
-        <button
-          type="button"
-          onClick={handleFacebookRegister}
-          disabled={fbLoading}
-          className="w-full bg-[#1877F2] text-white py-2 rounded-lg text-sm font-medium hover:bg-[#1565e0] disabled:opacity-50 flex items-center justify-center gap-2 transition-colors mb-5"
-        >
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.413c0-3.007 1.792-4.669 4.532-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z" />
-          </svg>
-          {fbLoading ? "Connecting…" : "Continue with Facebook"}
-        </button>
-
-        <div className="flex items-center mb-5">
-          <hr className="flex-1 border-gray-200" />
-          <span className="px-3 text-xs text-gray-400">or register with email</span>
-          <hr className="flex-1 border-gray-200" />
-        </div>
-
+        {/* Email / password form — shown first */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -151,6 +131,25 @@ export default function RegisterPage({ setUser }: { setUser: (u: any) => void })
             {loading ? "Creating account…" : "Create account"}
           </button>
         </form>
+
+        {/* Facebook sign-up — below the form */}
+        <div className="flex items-center my-5">
+          <hr className="flex-1 border-gray-200" />
+          <span className="px-3 text-xs text-gray-400">or continue with</span>
+          <hr className="flex-1 border-gray-200" />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleFacebookRegister}
+          disabled={fbLoading}
+          className="w-full bg-[#1877F2] text-white py-2 rounded-lg text-sm font-medium hover:bg-[#1565e0] disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+        >
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.413c0-3.007 1.792-4.669 4.532-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z" />
+          </svg>
+          {fbLoading ? "Connecting…" : "Continue with Facebook"}
+        </button>
 
         <p className="text-center text-sm text-gray-500 mt-6">
           Already have an account?{" "}
