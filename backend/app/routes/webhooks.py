@@ -13,7 +13,6 @@ immediately on their dashboard — no manual steps needed.
 """
 
 import logging
-import httpx
 from fastapi import APIRouter, HTTPException, Query, Request
 from app.config import settings
 from app.services import supabase_service as db
