@@ -176,3 +176,81 @@ async def get_active_qna_session(class_id: str) -> Optional[Dict]:
 
 async def submit_qna_question(question_data: Dict) -> Dict:
     return _post("qna_questions", question_data)
+# ─── Enrollments ─────────────────────────────────────────────────────────────
+
+async def check_student_enrollment(student_id: str, class_id: str) -> bool:
+    rows = _get(
+        "enrollments",
+        {
+            "student_id": f"eq.{student_id}",
+            "class_id": f"eq.{class_id}",
+            "select": "id",
+            "limit": "1",
+        },
+    )
+    return bool(rows)
+
+
+# ─── Livestream Admin Actions ────────────────────────────────────────────────
+
+async def create_livestream_record(data: Dict) -> Dict:
+    return _post("livestreams", data)
+
+
+async def update_livestream_record(livestream_id: str, updates: Dict) -> Optional[Dict]:
+    rows = _patch(
+        "livestreams",
+        {"id": f"eq.{livestream_id}"},
+        updates,
+    )
+    return rows
+
+# ─── Additional CRUD Helpers ─────────────────────────────────────────────────
+
+async def check_student_enrollment(student_id: str, class_id: str) -> bool:
+    rows = _get("enrollments", {"student_id": f"eq.{student_id}", "class_id": f"eq.{class_id}", "select": "id"})
+    return len(rows) > 0
+
+async def update_qna_question(question_id: str, updates: Dict) -> Dict:
+    return _patch("qna_questions", {"id": f"eq.{question_id}"}, updates)
+
+async def update_qna_session(session_id: str, updates: Dict) -> Dict:
+    return _patch("qna_sessions", {"id": f"eq.{session_id}"}, updates)
+
+async def create_quiz_record(data: Dict) -> Dict:
+    return _post("quizzes", data)
+
+async def add_quiz_question(data: Dict) -> Dict:
+    return _post("quiz_questions", data)
+
+async def update_quiz_record(quiz_id: str, updates: Dict) -> Dict:
+    return _patch("quizzes", {"id": f"eq.{quiz_id}"}, updates)
+
+async def check_quiz_answer_exists(student_id: str, question_id: str) -> bool:
+    rows = _get("quiz_answers", {"student_id": f"eq.{student_id}", "question_id": f"eq.{question_id}", "select": "id"})
+    return len(rows) > 0
+
+async def update_comment_record(comment_id: str, updates: Dict) -> Dict:
+    return _patch("comments", {"id": f"eq.{comment_id}"}, updates)
+
+async def get_quiz_questions_for_scoring(quiz_id: str) -> List[Dict]:
+    return _get("quiz_questions", {"quiz_id": f"eq.{quiz_id}", "select": "id, correct_answer"})
+
+async def upsert_ai_recommendation(data: Dict) -> Dict:
+    # PostgREST upsert is done via POST with a specific header
+    with httpx.Client(timeout=10) as client:
+        headers = _headers()
+        headers["Prefer"] = "resolution=merge-duplicates"
+        resp = client.post(f"{_base()}/ai_recommendations", headers=headers, json=data)
+        resp.raise_for_status()
+        return resp.json()
+def get_supabase_client():
+    """
+    TEMPORARY STUB: 
+    This allows the app to boot while we refactor the routes.
+    The app will only crash if an old route is actually triggered.
+    """
+    raise RuntimeError(
+        "Legacy get_supabase_client was called! "
+        "This route needs to be refactored to use the new service functions."
+    )
