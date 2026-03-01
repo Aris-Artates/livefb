@@ -32,16 +32,6 @@ async def get_livestream_detail(
     stream = await db.get_livestream(livestream_id)
     if not stream:
         raise HTTPException(status_code=404, detail="Livestream not found")
-
-    if current_user["role"] == "student":
-        enrolled = await db.check_student_enrollment(
-            current_user["id"], stream["class_id"]
-        )
-        if not enrolled:
-            raise HTTPException(
-                status_code=403, detail="You are not enrolled in this class"
-            )
-
     return stream
 
 

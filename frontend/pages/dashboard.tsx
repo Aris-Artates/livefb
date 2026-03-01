@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { livestreamApi, aiApi } from "../utils/api";
 import { type User } from "../utils/auth";
 import Navbar from "../components/Navbar";
+import LivestreamEmbed from "../components/LivestreamEmbed";
 
 export default function Dashboard({
   user,
@@ -13,6 +14,9 @@ export default function Dashboard({
   const [livestreams, setLivestreams] = useState<any[]>([]);
   const [recommendations, setRecommendations] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  const fetchLivestreams = () =>
+    livestreamApi.list().then((res) => setLivestreams(res.data)).catch(() => {});
 
   useEffect(() => {
     if (!user) {
@@ -31,6 +35,10 @@ export default function Dashboard({
         setRecommendations(recsResult.value.data);
       }
     }).finally(() => setLoading(false));
+
+    // Poll every 30 seconds to auto-detect new Facebook Live streams
+    const interval = setInterval(fetchLivestreams, 30_000);
+    return () => clearInterval(interval);
   }, [user]);
 
   if (!user || loading) {
@@ -65,42 +73,55 @@ export default function Dashboard({
           </p>
         </div>
 
-        {/* Live Now */}
+        {/* Live Now — embedded player */}
         {liveStreams.length > 0 && (
           <section className="mb-8">
             <div className="flex items-center gap-2 mb-4">
               <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
               <h2 className="text-lg font-semibold text-gray-900">Live Now</h2>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {liveStreams.map((stream) => (
-                <div
-                  key={stream.id}
-                  className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="bg-red-100 text-red-700 text-xs font-medium px-2 py-0.5 rounded-full">
+
+            {liveStreams.map((stream) => (
+              <div
+                key={stream.id}
+                className="bg-black rounded-xl overflow-hidden shadow-lg mb-4"
+              >
+                {/* Facebook live player embedded directly */}
+                <LivestreamEmbed
+                  facebookVideoId={stream.facebook_video_id}
+                  facebookGroupId={stream.facebook_group_id}
+                  title={stream.title}
+                />
+
+                {/* Stream info bar */}
+                <div className="bg-gray-900 px-4 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">
                       LIVE
                     </span>
-                    <span className="text-xs text-gray-500">
-                      {stream.classes?.subject}
-                    </span>
+                    <div>
+                      <p className="text-white font-semibold text-sm">
+                        {stream.title}
+                      </p>
+                      {stream.classes?.title && (
+                        <p className="text-gray-400 text-xs">
+                          {stream.classes.title}
+                          {stream.classes?.subject
+                            ? ` · ${stream.classes.subject}`
+                            : ""}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <h3 className="font-semibold text-gray-900 mb-1">
-                    {stream.title}
-                  </h3>
-                  <p className="text-sm text-gray-500 mb-4">
-                    {stream.classes?.title}
-                  </p>
                   <button
                     onClick={() => router.push(`/livestream/${stream.id}`)}
-                    className="w-full bg-red-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+                    className="bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors whitespace-nowrap"
                   >
-                    Join Live
+                    Full Screen →
                   </button>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </section>
         )}
 
