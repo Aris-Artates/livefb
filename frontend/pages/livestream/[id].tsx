@@ -84,10 +84,7 @@ export default function LivestreamPage({ user }: { user: User | null }) {
                 )}
                 <h1 className="text-white text-xl font-bold">{stream.title}</h1>
               </div>
-              <p className="text-gray-400 text-sm mt-1">
-                {stream.classes?.title}
-                {stream.classes?.subject ? ` · ${stream.classes.subject}` : ""}
-              </p>
+              <p className="text-gray-400 text-sm mt-1">Facebook Live</p>
             </div>
 
             {/* Admin quiz trigger (placeholder – connect to your admin panel) */}

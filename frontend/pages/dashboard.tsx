@@ -103,13 +103,8 @@ export default function Dashboard({
                       <p className="text-white font-semibold text-sm">
                         {stream.title}
                       </p>
-                      {stream.classes?.title && (
-                        <p className="text-gray-400 text-xs">
-                          {stream.classes.title}
-                          {stream.classes?.subject
-                            ? ` · ${stream.classes.subject}`
-                            : ""}
-                        </p>
+                      {stream.title && (
+                        <p className="text-gray-400 text-xs">Facebook Live</p>
                       )}
                     </div>
                   </div>
@@ -144,7 +139,7 @@ export default function Dashboard({
                     {stream.title}
                   </h3>
                   <p className="text-sm text-gray-500 mb-4">
-                    {stream.classes?.title}
+                    Facebook Live
                   </p>
                   {stream.scheduled_at && (
                     <p className="text-xs text-blue-600 mb-4">
