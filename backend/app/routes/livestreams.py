@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 class CreateLivestreamRequest(BaseModel):
-    class_id: str
+    class_id: Optional[str] = None
     title: str
     facebook_video_id: Optional[str] = None
     facebook_group_id: Optional[str] = None

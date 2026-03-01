@@ -66,14 +66,9 @@ async def receive_webhook(request: Request):
 
 async def _handle_live_started(video_id: str, value: dict):
     """Create and activate a livestream record when a Facebook Live starts."""
-    if not settings.FACEBOOK_DEFAULT_CLASS_ID:
-        logger.warning("FACEBOOK_DEFAULT_CLASS_ID not set — cannot auto-create livestream")
-        return
-
     # Don't create duplicates if webhook fires more than once
     existing = await db.get_livestream_by_facebook_video_id(video_id)
     if existing:
-        # Already exists — just make sure it's active
         if not existing.get("is_active"):
             from datetime import datetime
             await db.update_livestream_record(
@@ -83,20 +78,21 @@ async def _handle_live_started(video_id: str, value: dict):
             logger.info("Re-activated existing livestream %s", existing["id"])
         return
 
-    # Fetch the video title from Facebook Graph API if possible
     title = value.get("title") or "Live Class"
-    group_id = settings.FACEBOOK_DEFAULT_GROUP_ID or None
-
     from datetime import datetime
-    record = await db.create_livestream_record({
-        "class_id": settings.FACEBOOK_DEFAULT_CLASS_ID,
+    data: dict = {
         "title": title,
         "facebook_video_id": video_id,
-        "facebook_group_id": group_id,
         "is_active": True,
-        "is_private": True,
+        "is_private": False,
         "started_at": datetime.utcnow().isoformat(),
-    })
+    }
+    if settings.FACEBOOK_DEFAULT_GROUP_ID:
+        data["facebook_group_id"] = settings.FACEBOOK_DEFAULT_GROUP_ID
+    if settings.FACEBOOK_DEFAULT_CLASS_ID:
+        data["class_id"] = settings.FACEBOOK_DEFAULT_CLASS_ID
+
+    record = await db.create_livestream_record(data)
     logger.info("Auto-created livestream %s for video %s", record.get("id"), video_id)
 
 
