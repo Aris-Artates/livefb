@@ -30,14 +30,25 @@ async def get_recommendations(
     # (Your existing logic to aggregate scores goes here, 
     # but ensure it uses the 'answers' list we just fetched)
 
-    # 3. Generate recommendations via Ollama
-    recommendations = await generate_school_recommendations(student_id, quiz_results)
+    # 3. Generate recommendations via Ollama (fail gracefully if Ollama is offline)
+    try:
+        recommendations = await generate_school_recommendations(student_id, quiz_results)
+    except Exception:
+        return {
+            "student_id": student_id,
+            "message": "AI recommendations are unavailable right now.",
+            "recommendations": [],
+            "based_on_quizzes": 0,
+        }
 
-    # 4. Cache in Supabase using the new REST helper
-    await db.upsert_ai_recommendation({
-        "student_id": student_id,
-        "recommendations": recommendations,
-        "generated_at": datetime.utcnow().isoformat(),
-    })
+    # 4. Cache in Supabase (non-fatal if it fails)
+    try:
+        await db.upsert_ai_recommendation({
+            "student_id": student_id,
+            "recommendations": recommendations,
+            "generated_at": datetime.utcnow().isoformat(),
+        })
+    except Exception:
+        pass
 
     return recommendations
