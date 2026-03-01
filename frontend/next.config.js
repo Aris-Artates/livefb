@@ -26,8 +26,8 @@ const nextConfig = {
               "frame-src https://www.facebook.com",
               // Facebook profile pictures / CDN
               "img-src 'self' data: https://*.fbcdn.net https://*.facebook.com",
-              // API calls
-              `connect-src 'self' ${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}`,
+              // API calls + Facebook SDK telemetry
+              `connect-src 'self' ${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"} https://www.facebook.com https://graph.facebook.com`,
               "style-src 'self' 'unsafe-inline'",
               "font-src 'self'",
             ].join("; "),
