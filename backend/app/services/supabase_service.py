@@ -12,6 +12,7 @@ with the sb_secret_* service-role key.
 """
 
 import httpx
+from fastapi import HTTPException
 from app.config import settings
 from typing import Optional, List, Dict, Any
 
@@ -33,17 +34,28 @@ def _headers(prefer: str = "return=representation") -> dict:
 
 # ─── Low-level helpers ────────────────────────────────────────────────────────
 
+def _raise(resp: httpx.Response) -> None:
+    """Convert Supabase error responses into readable HTTPExceptions."""
+    if resp.is_error:
+        try:
+            body = resp.json()
+            detail = body.get("message") or body.get("details") or body.get("hint") or str(body)
+        except Exception:
+            detail = resp.text or f"HTTP {resp.status_code}"
+        raise HTTPException(status_code=502, detail=f"Database error: {detail}")
+
+
 def _get(table: str, params: dict) -> list:
     with httpx.Client(timeout=10) as client:
         resp = client.get(f"{_base()}/{table}", headers=_headers(), params=params)
-        resp.raise_for_status()
+        _raise(resp)
         return resp.json() or []
 
 
 def _post(table: str, data: dict) -> dict:
     with httpx.Client(timeout=10) as client:
         resp = client.post(f"{_base()}/{table}", headers=_headers(), json=data)
-        resp.raise_for_status()
+        _raise(resp)
         result = resp.json()
         return result[0] if isinstance(result, list) else result
 
@@ -53,7 +65,7 @@ def _patch(table: str, params: dict, data: dict) -> dict:
         resp = client.patch(
             f"{_base()}/{table}", headers=_headers(), params=params, json=data
         )
-        resp.raise_for_status()
+        _raise(resp)
         result = resp.json()
         return result[0] if isinstance(result, list) else result
 
