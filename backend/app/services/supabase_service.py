@@ -259,6 +259,20 @@ async def get_livestream_by_facebook_video_id(fb_video_id: str) -> Optional[Dict
     return _one("livestreams", {"facebook_video_id": f"eq.{fb_video_id}"})
 
 
+async def deactivate_livestream_by_video_id(fb_video_id: str) -> None:
+    """Mark a livestream as inactive when the Facebook Live ends."""
+    with httpx.Client(timeout=10) as client:
+        resp = client.patch(
+            f"{_base()}/livestreams",
+            headers=_headers(prefer="return=minimal"),
+            params={"facebook_video_id": f"eq.{fb_video_id}"},
+            json={"is_active": False},
+        )
+        # 404 (no rows) is fine — record may have been deleted manually
+        if resp.is_error and resp.status_code != 404:
+            _raise(resp)
+
+
 def get_supabase_client():
     """
     TEMPORARY STUB: 

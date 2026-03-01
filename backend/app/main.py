@@ -1,11 +1,37 @@
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.routes import auth, livestreams, comments, quizzes, qna, ai, classes, webhooks
 from app.config import settings
+from app.services.fb_poller import poll_loop
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start background tasks on startup; cancel them on shutdown."""
+    poller_task = asyncio.create_task(poll_loop())
+    logger.info("App started — FB poller task created.")
+    try:
+        yield
+    finally:
+        poller_task.cancel()
+        try:
+            await poller_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("App shutdown — FB poller task stopped.")
+
 
 app = FastAPI(
     title="LMS API",
     version="1.0.0",
+    lifespan=lifespan,
     # Disable docs in production
     docs_url="/docs" if settings.ENVIRONMENT != "production" else None,
     redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
