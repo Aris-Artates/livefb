@@ -28,6 +28,14 @@ class Settings(BaseSettings):
     # Facebook — Default Class ID to assign auto-detected livestreams to
     FACEBOOK_DEFAULT_CLASS_ID: str = ""
 
+    # Facebook — Graph API polling (replaces webhooks for private groups)
+    # FACEBOOK_POLL_USER_TOKEN: long-lived User Access Token (valid 60 days)
+    # FACEBOOK_POLL_USER_ID:    your Facebook numeric user ID  (e.g. "123456789")
+    # If FACEBOOK_DEFAULT_GROUP_ID is also set, the poller checks the group;
+    # otherwise it checks the user's own live_videos.
+    FACEBOOK_POLL_USER_TOKEN: str = ""
+    FACEBOOK_POLL_USER_ID: str = ""
+
     # Ollama (local)
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3.2"
