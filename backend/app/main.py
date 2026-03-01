@@ -11,13 +11,16 @@ app = FastAPI(
     redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
 )
 
-# CORS — only allow the configured frontend origin
+# CORS — allow the configured frontend origin (set FRONTEND_URL on Railway)
+# Multiple origins can be comma-separated: https://a.vercel.app,https://b.vercel.app
+_origins = [o.strip() for o in settings.FRONTEND_URL.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL],
+    allow_origins=_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_methods=["*"],   # includes OPTIONS for preflight
+    allow_headers=["*"],   # includes Authorization
 )
 
 # Routers
