@@ -87,7 +87,6 @@ export default function AdminPage({ user }: { user: User | null }) {
   // ── Create ─────────────────────────────────────────────────────────────────
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.class_id) { setCreateError("Select a class."); return; }
     if (!form.title.trim()) { setCreateError("Enter a title."); return; }
     if (!form.facebook_video_id.trim()) { setCreateError("Paste the Facebook Live URL or video ID."); return; }
 
@@ -95,11 +94,11 @@ export default function AdminPage({ user }: { user: User | null }) {
     setCreateError("");
     try {
       const payload: any = {
-        class_id: form.class_id,
         title: form.title.trim(),
         facebook_video_id: form.facebook_video_id.trim(),
         is_private: form.is_private,
       };
+      if (form.class_id) payload.class_id = form.class_id;
       if (form.facebook_group_id.trim()) payload.facebook_group_id = form.facebook_group_id.trim();
       if (form.scheduled_at) payload.scheduled_at = new Date(form.scheduled_at).toISOString();
 
@@ -177,7 +176,7 @@ export default function AdminPage({ user }: { user: User | null }) {
               {/* Class dropdown */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Class <span className="text-red-500">*</span>
+                  Class <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
                 <select
                   value={form.class_id}
