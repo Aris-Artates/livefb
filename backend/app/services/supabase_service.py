@@ -91,18 +91,17 @@ async def update_user(user_id: str, updates: Dict) -> Dict:
 async def get_livestream(livestream_id: str) -> Optional[Dict]:
     rows = _get(
         "livestreams",
-        {"id": f"eq.{livestream_id}", "select": "*, classes(*)", "limit": "1"},
+        {"id": f"eq.{livestream_id}", "select": "*", "limit": "1"},
     )
     return rows[0] if rows else None
 
 
 async def get_livestreams_for_student(student_id: str) -> List[Dict]:
-    # Fetch all livestreams; filtering by enrollment is done in the route layer
-    return _get("livestreams", {"select": "*, classes(*)"})
+    return _get("livestreams", {"select": "*", "order": "started_at.desc.nullslast"})
 
 
 async def get_all_livestreams() -> List[Dict]:
-    return _get("livestreams", {"select": "*, classes(*)"})
+    return _get("livestreams", {"select": "*", "order": "started_at.desc.nullslast"})
 
 
 # ─── Comments ─────────────────────────────────────────────────────────────────
